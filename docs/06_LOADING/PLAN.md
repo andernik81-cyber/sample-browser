@@ -1,0 +1,13 @@
+# Stage 6 — Loading / scanning
+
+Добавить единый UI для длительных операций:
+- Scanning...
+- Indexing...
+- Loading sample...
+- Loading waveform...
+- Ready
+- Error
+
+Предусмотреть progress: current/total и percentage, где это возможно.
+
+Никакого реального сканирования сейчас: только mock state и presentation contract для будущего JUCE FileScanner/Indexer.
