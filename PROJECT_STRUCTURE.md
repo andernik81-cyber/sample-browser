@@ -2,13 +2,21 @@
 
 ## Назначение
 
-Этот репозиторий разделён на три логические части:
+Sample Browser — desktop sample browser для Windows. Проект использует существующий React/Vite UI как presentation layer внутри native-приложения на JUCE 9.0.2.
 
-- `frontend/` — текущий React/Vite интерфейс sample browser.
-- `juce/` — будущая native-часть приложения на JUCE 9.0.2 + CMake.
-- `docs/` — планы, промты и правила для поэтапного вайбкодинга интерфейса и последующего внедрения JUCE backend.
+Текущая граница ответственности:
 
-На текущем этапе реальный audio engine, ASIO, MIDI, файловый backend и metadata scanner здесь не реализуются. Сначала стабилизируется frontend и его UI/state-контракты.
+- `frontend/` — React/Vite UI, UI state и presentation logic;
+- `juce/` — native Windows host и будущий filesystem/audio backend;
+- `docs/` — планы, контракты и документация по этапам.
+
+## Текущее состояние
+
+**Stage 10 завершён:** React production build встроен в JUCE 9.0.2 через `juce::WebBrowserComponent`, WebView2 и `ResourceProvider`.
+
+Приложение уже запускается как Windows `.exe` и показывает существующий React Sample Browser UI.
+
+Native filesystem, scanner, real playback, ASIO, MIDI, metadata и VST3 ещё не реализованы.
 
 ## Структура
 
@@ -16,116 +24,167 @@
 sample-browser/
 │
 ├── frontend/
-│   ├── index.html              # HTML entry point React-приложения
-│   ├── package.json            # зависимости и npm scripts frontend
-│   ├── package-lock.json       # зафиксированные версии npm-зависимостей
-│   ├── vite.config.js          # конфигурация Vite
+│   ├── index.html
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── vite.config.js
+│   ├── dist/                    # production build для embedded WebView
 │   └── src/
-│       ├── App.jsx             # основной UI и текущая логика прототипа
-│       ├── main.jsx            # точка входа React
-│       └── styles.css          # визуальная система и layout
+│       ├── main.jsx
+│       ├── AppUnified.jsx
+│       ├── styles.css
+│       ├── components/
+│       │   └── AppHeader.jsx
+│       ├── features/
+│       │   ├── settings/
+│       │   └── library/
+│       ├── models/
+│       │   └── sampleModel.js
+│       └── utils/
+│           └── formatters.js
 │
 ├── juce/
-│   ├── README.md               # назначение будущей native части
+│   ├── CMakeLists.txt
+│   ├── BUILD_JUCE.bat
+│   ├── README.md
+│   ├── README_STAGE9.md
 │   └── Source/
-│       └── README.md            # место для будущих C++ файлов
+│       ├── Main.cpp
+│       ├── MainComponent.cpp
+│       ├── MainComponent.h
+│       └── README.md
 │
 ├── docs/
-│   ├── ROADMAP.md              # общий порядок этапов
-│   ├── FINAL_CHECKLIST.md      # финальная проверка готовности UI
-│   ├── 00_GLOBAL/              # общие правила для нейросети
-│   ├── 01_SETTINGS/            # Settings / Preferences
-│   ├── 02_AUDIO_DEVICE/        # Audio Device status
-│   ├── 03_MIDI/                # MIDI status
-│   ├── 04_TRANSPORT/           # transport state и time display
-│   ├── 05_METADATA/            # metadata panel и расширяемые поля
-│   ├── 06_LOADING/             # loading / scanning states
-│   └── 07_DATA_MODEL/          # модель Sample/File для JUCE bridge
+│   ├── ROADMAP.md
+│   ├── FINAL_CHECKLIST.md
+│   ├── 00_GLOBAL/
+│   ├── 01_SETTINGS/
+│   ├── 02_AUDIO_DEVICE/
+│   ├── 03_MIDI/
+│   ├── 04_TRANSPORT/
+│   ├── 05_METADATA/
+│   ├── 06_LOADING/
+│   ├── 07_DATA_MODEL/
+│   └── 08_NATIVE_INTEGRATION/
+│       └── PLAN.md
 │
-├── AGENTS.md                   # основной контракт поведения UI
-├── CONTEXT.md                  # текущее состояние и решения проекта
-├── README.md                   # краткое описание проекта
-└── PROJECT_STRUCTURE.md        # этот файл
+├── AGENTS.md
+├── CONTEXT.md
+├── README.md
+└── PROJECT_STRUCTURE.md
 ```
 
-## Что где изменять
+`juce/build/` является локальным build output и исключён из Git.
 
-### `frontend/`
+## `frontend/`
 
-Здесь сейчас находится весь рабочий UI.
+React отвечает за:
 
-Изменения интерфейса выполняются здесь. На подготовительном этапе не переносить сюда C++ и не реализовывать здесь ASIO/MIDI/audio engine.
+- отображение Folder Tree;
+- File Table;
+- waveform presentation;
+- Settings UI;
+- selection state;
+- search/filter UI;
+- UI playback state;
+- mock data до подключения native backend.
 
-Запуск frontend:
+Production build:
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Сборка для проверки:
-
-```bash
+```text
 cd frontend
 npm run build
 ```
 
-После каждого UI-этапа сборка должна оставаться рабочей.
+Vite использует `base: './'`, чтобы compiled frontend мог обслуживаться embedded ResourceProvider.
 
-### `juce/`
+## `juce/`
 
-Это зарезервированное место для будущего native приложения.
+JUCE native layer использует:
 
-Планируемые подсистемы:
+- JUCE 9.0.2;
+- CMake;
+- Visual Studio/MSVC;
+- `juce::WebBrowserComponent`;
+- Windows WebView2;
+- `WebBrowserComponent::ResourceProvider`.
 
-- JUCE 9.0.2
-- CMake
-- WebView2 / `juce::WebBrowserComponent`
-- Audio device management
-- ASIO
-- MIDI
-- audio playback
-- filesystem access
-- metadata scanning
-- sample database / cache
-- waveform generation
-- React ↔ C++ bridge
-
-Пока не размещать здесь незаконченный C++ код только ради создания файлов.
-
-### `docs/`
-
-Каждый этап UI имеет отдельные:
-
-- `PLAN.md` — что должно быть сделано;
-- `PROMPT.md` — готовое задание для нейросети;
-- `AGENTS.md` — ограничения конкретного этапа.
-
-Работать с этапами строго по порядку, начиная с `01_SETTINGS`.
-
-## Архитектурная граница
-
-Будущая архитектура:
+Сейчас native host уже загружает `frontend/dist` через:
 
 ```text
-React UI (frontend/)
-        │
-        │ JUCE WebView bridge
-        ▼
-JUCE C++ (juce/)
-        │
-        ├── Audio Engine
-        ├── ASIO
-        ├── MIDI
-        ├── Filesystem
-        ├── Metadata
-        ├── Database / Cache
-        └── Playback
+https://juce.backend/
 ```
 
-React отвечает за визуальное представление и UI state. JUCE отвечает за настоящие native/audio операции.
+Следующие native подсистемы будут добавляться поэтапно:
 
-## Важное правило
+1. native folder picker;
+2. filesystem scanner;
+3. React ↔ C++ bridge;
+4. real library index;
+5. audio playback;
+6. waveform generation/cache;
+7. audio device/ASIO;
+8. MIDI;
+9. metadata/tags/search;
+10. Explorer/REAPER drag & drop;
+11. VST3 hosting.
 
-Не переделывать существующий дизайн на JUCE Widgets только ради native UI. Цель проекта — использовать существующий React интерфейс внутри JUCE WebView и постепенно заменить mock/test data на данные от C++ backend.
+## Архитектура
+
+```text
+                         Sample Browser.exe
+                                │
+                        JUCE 9.0.2 host
+                                │
+                         WebBrowserComponent
+                                │
+                             WebView2
+                                │
+                       ResourceProvider
+                                │
+                         frontend/dist
+                                │
+                           React UI
+                                │
+                    future JUCE ↔ React bridge
+                                │
+             ┌──────────────────┴──────────────────┐
+             │                                     │
+       Filesystem backend                    Audio backend
+             │                                     │
+      scanner / library                    playback / ASIO
+      metadata / tags                         waveform
+      native file paths                         MIDI
+```
+
+## Архитектурное правило
+
+React не должен становиться местом реализации native/audio функций.
+
+JUCE C++ отвечает за:
+
+- filesystem;
+- native OS dialogs;
+- scanning;
+- audio engine;
+- ASIO;
+- MIDI;
+- metadata;
+- database/cache;
+- native drag & drop;
+- VST3 hosting.
+
+Bridge должен только передавать данные и команды между UI и native layer.
+
+## Что не нужно коммитить
+
+Не добавлять в Git:
+
+- `juce/build/`;
+- `.pdb`;
+- `.obj`;
+- `.lib`, сгенерированные build system;
+- Visual Studio intermediate files;
+- другие временные build artifacts.
+
+Не коммитить сам WebView2 SDK внутрь репозитория. Локальный путь SDK задаётся в native build configuration.
