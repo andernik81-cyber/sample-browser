@@ -1,0 +1,101 @@
+.button-settings,
+.settings-close-button {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: #b3b3b3;
+  background: #1f1f1f;
+  border: 1px solid #292929;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.button-settings { margin-left: auto; }
+.button-settings:hover,
+.settings-close-button:hover { background: #282828; border-color: #333333; }
+.button-settings:active,
+.settings-close-button:active,
+.button-settings[aria-expanded="true"] { background: #1c2736; border-color: #233043; }
+.button-settings[aria-expanded="true"]:hover { background: #233043; border-color: #2b374f; }
+.button-settings:focus-visible,
+.settings-close-button:focus-visible,
+.settings-section-button:focus-visible,
+.settings-panel-content:focus-visible { outline: 1px solid #667c99; outline-offset: -2px; }
+
+.settings-panel {
+  position: absolute;
+  top: 34px;
+  right: 1px;
+  bottom: 1px;
+  z-index: 5;
+  width: 320px;
+  max-width: calc(100% - 2px);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: #b3b3b3;
+  background: #0f0f0f;
+  border-left: 1px solid #282828;
+  font-family: "Inter", sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+}
+.settings-panel[hidden] { display: none; }
+.settings-panel-header {
+  height: 32px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 4px;
+  border-bottom: 1px solid #282828;
+}
+.settings-title-text { margin: 0; font-size: 16px; font-weight: 400; }
+.settings-panel-body { display: flex; flex: 1; min-height: 0; min-width: 0; overflow: hidden; }
+.settings-panel-nav {
+  width: 108px;
+  flex-shrink: 0;
+  padding: 4px;
+  border-right: 1px solid #282828;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #4a4a4a #0f0f0f;
+}
+.settings-section-button {
+  display: block;
+  width: 100%;
+  height: 24px;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: #b3b3b3;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.settings-section-button:hover { background: #191919; }
+.settings-section-button.is-active { color: #c2cbd6; background: #1c2736; border-color: #233043; }
+.settings-section-button.is-active:hover,
+.settings-section-button:active { background: #233043; border-color: #2b374f; }
+.settings-panel-content {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #4a4a4a #0f0f0f;
+}
+.settings-section-title-text { margin: 0 0 12px; font-size: 16px; font-weight: 400; }
+.settings-placeholder-text { margin: 0; color: #666666; font-size: 14px; overflow-wrap: anywhere; }
