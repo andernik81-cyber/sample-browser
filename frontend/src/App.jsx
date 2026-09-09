@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { fmtLength } from './utils/formatters.js'
 
 /* ========================= утилиты ========================= */
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v))
@@ -31,27 +32,6 @@ function makeWaveform(id, n = 160) {
     bars.push(Math.max(0.04, Math.min(1, (0.25 + 0.75 * rnd()) * env + rnd() * 0.08)))
   }
   return bars
-}
-function fmtLength(sec) {
-  const totalMs = Math.round(sec * 1000)
-  const h = Math.floor(totalMs / 3600000)
-  const m = Math.floor((totalMs % 3600000) / 60000)
-  const s = Math.floor((totalMs % 60000) / 1000)
-  const ms = totalMs % 1000
-
-  const sStr = String(s).padStart(2, '0')
-  const msStr = String(ms).padStart(3, '0')
-
-  if (h > 0) {
-    const hStr = String(h).padStart(2, '0')
-    const mStr = String(m).padStart(2, '0')
-    return `${hStr}:${mStr}:${sStr}.${msStr}`
-  }
-  if (m > 0) {
-    const mStr = String(m).padStart(2, '0')
-    return `${mStr}:${sStr}.${msStr}`
-  }
-  return `00:${sStr}.${msStr}`
 }
 
 /* ========================= данные ========================= */
