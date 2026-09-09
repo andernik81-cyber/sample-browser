@@ -1,0 +1,35 @@
+.settings-audio-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.settings-audio-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.settings-audio-label { color: #b3b3b3; font-size: 14px; line-height: 1.2; }
+.settings-audio-select {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: 24px;
+  padding: 2px 6px;
+  color: #b3b3b3;
+  background: #1f1f1f;
+  border: 1px solid #292929;
+  border-radius: 3px;
+  font: inherit;
+  color-scheme: dark;
+}
+.settings-audio-select:hover { background: #282828; border-color: #333333; }
+.settings-audio-select:focus-visible { outline: 1px solid #667c99; outline-offset: -2px; }
+.settings-audio-description {
+  margin: 0;
+  color: #666666;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}

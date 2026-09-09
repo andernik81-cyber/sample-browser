@@ -258,6 +258,15 @@ export default function App() {
   const [position, setPosition] = useState(0)
   const [volume, setVolume] = useState(0.0)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settings, setSettings] = useState(() => ({
+    audio: {
+      driver: 'asio',
+      device: 'example-asio-device',
+      sampleRate: 48000,
+      bufferSize: 256,
+      output: '1-2',
+    },
+  }))
   const settingsButtonRef = useRef(null)
 
   const folderInputRef = useRef(null)
@@ -439,6 +448,13 @@ export default function App() {
     settingsButtonRef.current?.focus()
   }
 
+  const updateAudioSetting = (key, value) => {
+    setSettings((current) => ({
+      ...current,
+      audio: { ...current.audio, [key]: value },
+    }))
+  }
+
   return (
     <div className="sample-browser-app">
       {/* ===== AppHeader ===== */}
@@ -592,7 +608,12 @@ export default function App() {
           </div>
         </div>
       </div>
-      <SettingsPanel isOpen={settingsOpen} onClose={closeSettings} />
+      <SettingsPanel
+        isOpen={settingsOpen}
+        onClose={closeSettings}
+        settings={settings}
+        onAudioSettingChange={updateAudioSetting}
+      />
     </div>
   )
 }
