@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fmtLength } from './utils/formatters.js'
 import { AppHeader } from './components/AppHeader.jsx'
+import { SettingsPanel } from './features/settings/SettingsPanel.jsx'
 
 /* ========================= утилиты ========================= */
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v))
@@ -256,6 +257,8 @@ export default function App() {
   const [playing, setPlaying] = useState(false)
   const [position, setPosition] = useState(0)
   const [volume, setVolume] = useState(0.0)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const settingsButtonRef = useRef(null)
 
   const folderInputRef = useRef(null)
   const volDrag = useRef(null)
@@ -431,6 +434,11 @@ export default function App() {
 
   const stopDisabled = !currentFile || (!playing && position === 0)
 
+  const closeSettings = () => {
+    setSettingsOpen(false)
+    settingsButtonRef.current?.focus()
+  }
+
   return (
     <div className="sample-browser-app">
       {/* ===== AppHeader ===== */}
@@ -439,6 +447,9 @@ export default function App() {
         onOpenFolder={press(() => folderInputRef.current?.click())}
         onFolderPick={handleFolderPick}
         folderIcon={<IconFolder />}
+        settingsOpen={settingsOpen}
+        settingsButtonRef={settingsButtonRef}
+        onToggleSettings={press(() => setSettingsOpen((open) => !open))}
       />
 
       {/* ===== BodyLayout ===== */}
@@ -581,6 +592,7 @@ export default function App() {
           </div>
         </div>
       </div>
+      <SettingsPanel isOpen={settingsOpen} onClose={closeSettings} />
     </div>
   )
 }
