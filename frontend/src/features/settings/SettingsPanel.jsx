@@ -1,9 +1,10 @@
 import { useState } from 'react'
+import { AudioSettings } from './AudioSettings.jsx'
 import './settings.css'
 
 const SECTIONS = ['General', 'Audio', 'Playback', 'MIDI', 'Library', 'Metadata', 'Search', 'Browser']
 
-export const SettingsPanel = ({ isOpen, onClose }) => {
+export const SettingsPanel = ({ isOpen, onClose, settings, onAudioSettingChange }) => {
   const [activeSection, setActiveSection] = useState(SECTIONS[0])
 
   return (
@@ -60,7 +61,11 @@ export const SettingsPanel = ({ isOpen, onClose }) => {
           tabIndex={0}
         >
           <h3 id="settings-section-title" className="settings-section-title-text" data-testid="settings-active-section">{activeSection}</h3>
-          <p className="settings-placeholder-text" data-testid="settings-section-placeholder">Settings for this section will be added in the next step.</p>
+          {activeSection === 'Audio' ? (
+            <AudioSettings audio={settings.audio} onChange={onAudioSettingChange} />
+          ) : (
+            <p className="settings-placeholder-text" data-testid="settings-section-placeholder">Settings for this section will be added in the next step.</p>
+          )}
         </section>
       </div>
     </aside>

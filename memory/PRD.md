@@ -1,7 +1,7 @@
-# Sample Browser — Settings panel shell
+# Sample Browser — Audio Settings (local React state)
 
 ## Original problem statement
-Implement ONLY a Settings panel shell. Add a small accessible gear at the far right of the existing AppHeader; gear toggles a fixed-width right-side panel without navigation, replacing the browser, or resizing the existing layout. Panel has a Settings title, close button, scrollable navigation/content, and exactly General, Audio, Playback, MIDI, Library, Metadata, Search, Browser sections with simple future-settings text. App owns open/closed state and callbacks; SettingsPanel owns active section/panel state and remains mounted when closed. Preserve all existing UI, dimensions, colors, interactions, folder import, selection, sorting, scrolling, playback, and waveform. No actual settings controls, persistence, global state library, dependencies, JUCE/native/audio/device implementation, or unrelated refactoring. Verify build, gear/close/navigation, browser regressions and narrow widths; review diff. Save to GitHub with `refactor: add settings panel shell`, then STOP and report files/build/verification/hash.
+Implement ONLY Audio settings: exactly five English dropdowns. Audio Driver options ASIO/WASAPI/DirectSound (default ASIO); Audio Device options Default Device/No Device/Example ASIO Device (default Example ASIO Device); Sample Rate options 44100/48000/88200/96000/176400/192000 Hz (default48000); Buffer Size options32/64/128/256/512/1024/2048 samples (default256), with the exact text "Lower values reduce latency but increase CPU load." below it; Output options Output 1-2/3-4/5-6/7-8 (default1-2). MOCK/local values only, held outside temporary section state in native-friendly settings.audio shape. Values must survive closing/reopening and section switches. Preserve all existing panel styling/geometry/navigation/header, other Settings sections and browser behavior. No ASIO implementation, Web Audio, JUCE/native/device detection, persistence, Apply/Cancel, provider/state library, dependencies, or unrelated refactoring. Build, change all values and verify retention, verify browser regressions, review diff, save with `feat: add audio settings controls`, and STOP. Report files/build/verification/hash/exact state structure.
 
 ## Architecture decisions
 - Preserve the existing React 18 / Vite 5 desktop-style application.
@@ -12,7 +12,10 @@ Implement ONLY a Settings panel shell. Add a small accessible gear at the far ri
 - Non-modal, right-side 320px overlay; maximum width is capped to the app width. It starts below the unchanged 32px app header and does not participate in flex layout.
 - New styles are scoped in `frontend/src/features/settings/settings.css`; original `styles.css` is unchanged.
 - New controls use left-mousedown immediate commands, ignore right-click, and support keyboard-generated click without duplicate mouse activation.
-- No new dependencies, other component refactoring, persistence, actual settings controls, or native integrations.
+- App now also owns the settings object; SettingsPanel receives settings and onAudioSettingChange, and only Audio renders a controlled AudioSettings component.
+- AudioSettings has no local state. Option labels are separate from native-friendly values; DOM selection strings are mapped back to typed option values.
+- Audio-specific styles live in `audio-settings.css`; both existing `settings.css` and original `styles.css` remain unchanged.
+- Only Audio has local settings controls. No dependencies, other section implementation, persistence, providers, Apply/Cancel, or native integrations.
 
 ## Previously implemented
 - Added `frontend/src/utils/formatters.js` with the original formatter implementation and an export.
@@ -35,7 +38,7 @@ Implement ONLY a Settings panel shell. Add a small accessible gear at the far ri
 - Test report: `test_reports/iteration_1.json`; no new functional or visual regressions. Existing table clipping at390px predates the refactor and was intentionally not changed.
 - Runtime-only preview support was configured outside the repository: supervisor program `sample-browser-preview` in `/etc/supervisor/conf.d/sample-browser-preview.conf` runs `/tmp/sample-browser-vite-runner.mjs` on the existing frontend port, with an explicit proxy-host allowlist. Repository package/Vite configs are unchanged. The original template frontend runner still uses nonexistent `yarn start`; use the supplemental runner for this session.
 
-## Current Settings shell implemented and verified
+## Previously verified Settings shell
 - Added `SettingsPanel.jsx` and scoped `settings.css` under `frontend/src/features/settings/`; modified App.jsx/AppHeader.jsx only for the gear and shell wiring.
 - Baseline revision: `f9f5a3fd1ada5be9719fbd5be823cf9443694eb2`. Existing browser body/waveform DOM and all measured geometry match baseline with Settings both closed and open at 1920x800 and 390x844.
 - Fixed 320px panel: desktop x1599/y34/w320/h765, narrow-window x69/y34/w320/h809. No existing layout adjustment was necessary and Settings introduces no horizontal overflow.
@@ -46,10 +49,35 @@ Implement ONLY a Settings panel shell. Add a small accessible gear at the far ri
 - Report: `test_reports/iteration_2.json`; no new product bugs. Existing narrow-window file-table clipping remains an intentionally preserved baseline limitation.
 - Diff reviewed: original styles.css, main.jsx, formatter, package/lock and Vite config unchanged; no unrelated browser handlers/state were changed.
 
+## Current Audio settings implemented and verified
+- Baseline: `dc7bcfe3bab508c575127904d3da21519a57200d`. Added `AudioSettings.jsx` and `audio-settings.css`; modified only App state/update/props and SettingsPanel's Audio-specific content branch.
+- Exactly five native dropdowns, 23 options, requested defaults, linked English labels and exact Buffer Size description verified.
+- App uses functional immutable updates for one audio key, preserving all other fields. Default state:
+
+```js
+settings = {
+  audio: {
+    driver: 'asio',
+    device: 'example-asio-device',
+    sampleRate: 48000,
+    bufferSize: 256,
+    output: '1-2',
+  },
+}
+```
+
+- Verified committed React runtime types: driver/device/output strings; sampleRate/bufferSize numbers, both before and after edits.
+- All values retain after close-button/gear close/reopen, switching through all seven other sections, and unrelated browser rerenders/playback. Full reload resets defaults intentionally (no persistence).
+- Other seven section contents match baseline byte-for-byte. Header/browser/waveform DOM and panel geometry match baseline at1920x800 and390x844. All five controls visible; no new overflow.
+- Independent browser regressions passed: selection, keyboard, sorting, folder arrows/rows, play/stop/seek/Auto Play/volume, folder import/reimport and cancel-event/empty-change simulation. Native OS dialog cancellation not automated.
+- Production build passed37modules to `/tmp/sample-browser-audio-settings-build.9SFWNw`, independently repeated at `/tmp/sample-browser-audio-settings-build-t1`. No generated frontend/dist or dependency changes.
+- Report: `test_reports/iteration_3.json`; no new product bugs. Existing narrow-window table clipping remains baseline behavior.
+- Full tracked and new-source diffs reviewed; original styles.css, settings.css, AppHeader, formatter, package/lock and Vite config unchanged.
+
 ## Prioritized backlog
-- P0: User saves the verified shell via Save to GitHub. No direct git commit/push was performed; no new pushed hash is available. Message: `refactor: add settings panel shell`.
-- P1: No actual settings controls or further implementation authorized.
-- P2: Existing narrow-window table clipping remains separate baseline debt, not part of this task.
+- P0: User saves via Save to GitHub with `feat: add audio settings controls`. No direct agent commit/push performed; no new pushed hash available.
+- P1: No other Settings section or native integration authorized.
+- P2: Existing narrow-window table clipping remains unrelated baseline debt.
 
 ## Next tasks
 Stop. Wait for the user's next instruction; do not continue refactoring.
