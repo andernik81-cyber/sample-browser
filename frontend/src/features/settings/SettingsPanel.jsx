@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { AudioSettings } from './AudioSettings.jsx'
+import { LibrarySettings } from '../library/LibrarySettings.jsx'
 import './settings.css'
 
 const SECTIONS = ['General', 'Audio', 'Playback', 'MIDI', 'Library', 'Metadata', 'Search', 'Browser']
 
-export const SettingsPanel = ({ isOpen, onClose, settings, onAudioSettingChange }) => {
+export const SettingsPanel = ({ isOpen, onClose, settings, onAudioSettingChange, onLibraryChange }) => {
   const [activeSection, setActiveSection] = useState(SECTIONS[0])
 
   return (
@@ -63,6 +64,8 @@ export const SettingsPanel = ({ isOpen, onClose, settings, onAudioSettingChange 
           <h3 id="settings-section-title" className="settings-section-title-text" data-testid="settings-active-section">{activeSection}</h3>
           {activeSection === 'Audio' ? (
             <AudioSettings audio={settings.audio} onChange={onAudioSettingChange} />
+          ) : activeSection === 'Library' ? (
+            <LibrarySettings library={settings.library} onChange={onLibraryChange} />
           ) : (
             <p className="settings-placeholder-text" data-testid="settings-section-placeholder">Settings for this section will be added in the next step.</p>
           )}

@@ -266,6 +266,14 @@ export default function App() {
       bufferSize: 256,
       output: '1-2',
     },
+    library: {
+      folders: [
+        { id: 'library-1', path: 'D:\\Samples', status: 'online' },
+        { id: 'library-2', path: 'E:\\Sound Design', status: 'offline' },
+      ],
+      scanSubfolders: true,
+      scanOnStartup: true,
+    },
   }))
   const settingsButtonRef = useRef(null)
 
@@ -455,6 +463,10 @@ export default function App() {
     }))
   }
 
+  const updateLibrarySettings = (update) => {
+    setSettings((current) => ({ ...current, library: update(current.library) }))
+  }
+
   return (
     <div className="sample-browser-app">
       {/* ===== AppHeader ===== */}
@@ -613,6 +625,7 @@ export default function App() {
         onClose={closeSettings}
         settings={settings}
         onAudioSettingChange={updateAudioSetting}
+        onLibraryChange={updateLibrarySettings}
       />
     </div>
   )
