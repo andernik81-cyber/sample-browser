@@ -1,171 +1,216 @@
-```markdown
 # Sample Browser — Project Context
 
-**Создан:** 8 сентября 2026 г.
-**Состояние проекта:** текущее, по итогам диалога по доводке UI до дизайна Penpot.
-**Файлы проекта:** `src/App.jsx`, `src/styles.css`. Никаких сборщиков, чистый React + хуки, шрифт Inter.
-**Референс-документы:** `Penpot-Code-Clean-2.txt` (экспорт дизайна), `Design-System-Clean-2.txt` (дизайн-система).
-
----
+**Обновлено:** 10 сентября 2026 г.
+**Текущее состояние:** Stage 10 завершён; React UI встроен в JUCE 9.0.2 Windows-приложение через WebView2.
 
 ## 1. Что это
 
-Desktop sample browser для Windows. Приложение для просмотра и предпрослушивания аудио-файлов (sample packs). Состоит из:
-- Дерево папок слева (FolderTree, 164px)
-- Таблица файлов по центру (FileTable, flex: 1)
-- Панель формы волны и управления воспроизведением внизу (WaveformPanel, 160px)
+Sample Browser — desktop sample browser для Windows для просмотра, поиска и предпрослушивания аудиофайлов и sample packs.
 
-## 2. Контракт поведения UI (принципы)
+Текущий UI состоит из:
 
-1. Одинаковое действие → одинаковый результат во всех частях приложения.
-2. Пользователь не должен случайно изменить данные простым кликом.
-3. Hover только показывает состояние и никогда сам по себе не выполняет действие.
-4. Клик должен иметь минимальную задержку и ощущаться мгновенным.
-5. Drag и Click должны быть однозначно различимы (порог 4px, `DRAG_THRESHOLD_PX`).
-6. Малые непреднамеренные движения мыши не должны превращать обычный клик в drag.
-7. Состояние интерфейса всегда должно быть визуально очевидным.
-8. Не создавать неожиданных toggle/action behavior.
-9. Использовать стандартные desktop UI conventions.
-10. При отсутствии специального правила — следовать macOS/Windows native UX.
+- Folder Tree слева;
+- File Table по центру;
+- waveform/playback panel снизу;
+- header и Settings panel.
 
-## 3. Реализованные решения
+Интерфейс реализован на React/Vite и сейчас работает на mock-данных.
 
-### 3.1 Все действия по нажатию мыши (mousedown)
+## 2. Текущая архитектура
 
-- **Все** действия (клик по папке, файлу, кнопке, сортировка, seek по волне) выполняются по `mousedown`, а не `click` — мгновенный отклик.
-- Правая кнопка мыши игнорируется (`if (e.button === 0)`), оставлена под контекстное меню.
-- Исключение: перетаскивание громкости и ручка скроллбара работали по `pointerdown` изначально, их не трогали.
-
-### 3.2 Оверлейный скроллбар (OverlayScroll)
-
-Компонент `OverlayScroll` в `App.jsx`:
-- Родная полоса прокрутки скрыта (`scrollbar-width: none` + `::-webkit-scrollbar { display: none }`), контент никогда не сдвигается.
-- Ручка 8px, полупрозрачная тёмная, рисуется **поверх** контента справа, не занимает места в раскладке.
-- Ручку можно таскать мышью (`onPointerDown`), при hover/drag становится ярче.
-- Появляется только когда контент не помещается (ResizeObserver).
-
-### 3.3 Дерево папок: три раздельных действия
-
-1. **Клик по стрелочке** (IconExpandSlot 16×16px, слева) → только toggle (открыть/закрыть). Выделение не меняется (`stopPropagation`).
-2. **Клик по папке** (названию) → только выделить и показать файлы. Папка не раскрывается.
-3. **Двойной клик по папке** → toggle. Распознаётся по двум быстрым нажатиям (порог `DOUBLE_PRESS_MS = 500`), срабатывает **на втором нажатии**, без ожидания отпускания.
-
-`IconExpandSlot` 16×16px нужен, чтобы текст папки не смещался при раскрытии (в Penpot иконки разного размера, у нас фиксированный слот).
-
-### 3.4 Сортировка колонок
-
-- Сортировка по клику на заголовок (`mousedown`).
-- Имя колонки **не** подсвечивается при сортировке (цвет всегда `#666666`), признак сортировки — только стрелка рядом (`SortAsc` / `SortDesc`, `#b3b3b3`).
-
-### 3.5 Громкость (VolumeControlBadge)
-
-- **Вертикальное** перетаскивание: вверх = громче, вниз = тише.
-- Диапазон: **−60.0 … 12.0**, шаг **0.5 dB**.
-- Чувствительность: **12px движения мыши = 0.5 dB** (`VOLUME_PX_PER_STEP = 12`).
-- Порог 4px (`DRAG_THRESHOLD_PX = 4`) — одиночный клик и дрожание мыши громкость не меняют.
-- **Двойной клик** по бейджу → сброс в **0.0**.
-- Курсор `ns-resize`, title: «Drag vertically to adjust, double-click to reset».
-
-### 3.6 Обводка VolumeControlBadge
-
-- Слой-оверлей рисуется **поверх всех внутренностей**, как stroke в Penpot:
-  ```css
-  .volume-control-badge::after {
-    content: "";
-    position: absolute; inset: 0;
-    border: 1px solid #282828; border-radius: 3px;
-    pointer-events: none;
-  }
-  ```
-- `pointer-events: none` — чтобы оверлей не мешал драгу громкости.
-- Секции «Volume» и значение имеют полную высоту 24px (`height: 24px`), уходят под обводку до края.
-- Секция значения: `flex: 1` (равномерная обводка со всех сторон), поле цифр `width: 41px` + `flex-shrink: 0` (ширина не прыгает при смене значения, даже для «−60.0»).
-
-### 3.7 Форма волны
-
-- Клик по волне = мгновенный seek (по `mousedown`).
-- Визуализация: SVG с барами, пройденная часть зелёная (`#67cf67`), оставшаяся серая (`#4a4a4a`), маркер белый (`#d9d9d9`).
-
-### 3.8 Кнопки воспроизведения
-
-- **Auto Play** — toggle по нажатию.
-- **Play** / **Stop** — по нажатию. Stop disabled, когда не играет и позиция = 0.
-- Клавиатура в таблице файлов: `↑`/`↓` — перебор файлов, `Enter` — Play.
-
-## 4. Дизайн-система (ключевые токены)
-
-### Цвета
-
-- Фон приложения: `#282828`
-- Тёмные панели (header, tree, table, playback): `#0f0f0f`
-- Секции Volume: `#141414`
-- Кнопки/лого: `#1f1f1f` с обводкой `#292929`
-- Hover кнопок/строк: `#191919` (строки), `#282828` (кнопки)
-- Selected: `#1c2736` фон, `#233043` обводка
-- Selected+hover: `#233043` фон, `#2b374f` обводка
-- Play on: `#67cf67`
-- Текст обычный: `#b3b3b3`
-- Текст selected: `#c2cbd6`
-- Текст muted (в selected строках): `#667c99`
-- Текст заголовков колонок: `#666666`
-- Единицы «dB»: `#666666`
-
-### Размеры
-
-- Строки дерева/файлов: **24px**
-- Кнопки: **24px**
-- Панели header/playback: **32px**
-- Скругление: **3px**
-- Обводка: **1px**
-- Gap между элементами: **1px** (панели), **4px** (внутри строк/кнопок)
-
-### Шрифт
-
-- **Inter** 400, `local('Inter')`
-- Имена файлов/папок, logo, auto-play, volume label: **16px**
-- Значения в таблице, dB: **14px**
-- Заголовки колонок: **14px**
-
-## 5. Известные тонкости
-
-1. **`box-shadow: inset` не работает под детьми** в CSS (рисуется под содержимым элемента, но под его детьми — нет). Поэтому обводка реализована через `::after`, а не `box-shadow`.
-2. **Penpot-экспорт содержит много служебного мусора** (классы с хешами, вложенные `root-0-paragraph-set-0`). Истинная геометрия оттуда, но стили надо чистить.
-3. **Двойной клик по `onDoubleClick`** срабатывает после отпускания кнопки. Для мгновенного отклика распознаём вручную по двум быстрым `mousedown`.
-4. **Минимальная ширина поля значения 41px** рассчитана под самое широкое значение «−60.0» в Inter 16px.
-
-## 6. Правило работы с ассистентом
-
-Всегда придерживаться последовательности:
-1. **План** — описать, что будет сделано и какие файлы меняются.
-2. **Согласие** — дождаться «да» или уточнений.
-3. **Правка** — либо построчные замены, либо целиком файл по запросу.
-
-Правки давать максимально конкретные: номера строк, точный текст для замены, результат.
-
-## 7. Структура приложения
-
-```
-src/
-├── App.jsx          # Весь React: хуки, OverlayScroll, Waveform, App
-└── styles.css       # Все стили (без Tailwind/CSS-in-JS)
+```text
+React/Vite UI
+      ↓
+frontend/dist
+      ↓
+JUCE ResourceProvider
+      ↓
+https://juce.backend/
+      ↓
+juce::WebBrowserComponent
+      ↓
+WebView2
+      ↓
+Sample Browser.exe
 ```
 
-В `App.jsx` есть следующие именованные блоки:
-- Константы (`INITIAL_TREE`, `INITIAL_FILES`, `COLUMNS`, `AUDIO_EXT`)
-- Хелперы (`clamp`, `hashCode`, `mulberry32`, `makeWaveform`, `fmtLength`)
-- Иконки (`IconPlay`, `IconStop`, `IconFolder`, `ChevronDown`, `ChevronRight`, `SortAsc`, `SortDesc`, `IconExpandSlot`)
-- `OverlayScroll` — компонент оверлейного скроллбара
-- `Waveform` — визуализация волны
-- `App` — корневой компонент со всеми стейтами и обработчиками
+JUCE является native host. React остаётся presentation/UI layer.
 
-## 8. Как начать новый чат
+## 3. Stage 10 — завершено
 
-В новом чате первым сообщением прикрепить:
-1. Этот файл `CONTEXT.md`
-2. `Penpot-Code-Clean-2.txt`
-3. `Design-System-Clean-2.txt`
+Выполнено:
 
-И написать: «Продолжаем работу над sample-browser. Сначала читай контекст, потом отвечай.»
+- JUCE 9.0.2 + CMake native project;
+- WebView2 Runtime установлен;
+- Microsoft.Web.WebView2 SDK подготовлен локально;
+- `JUCE_USE_WIN_WEBVIEW2=1`;
+- `JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1`;
+- `juce::juce_webview2` подключён;
+- `juce::WebBrowserComponent` использует backend `webview2`;
+- `ResourceProvider` обслуживает `frontend/dist`;
+- root URL — `https://juce.backend/`;
+- Vite использует `base: './'`;
+- frontend production build успешно создаётся;
+- React UI работает внутри собранного `.exe`;
+- WebView занимает всю область `MainComponent`;
+- build directory `juce/build/` исключён из Git.
 
-Ассистент за секунды войдёт в курс дела и будет знать все договорённости.
+## 4. Frontend
+
+Основная структура:
+
+```text
+frontend/
+├── index.html
+├── package.json
+├── package-lock.json
+├── vite.config.js
+├── dist/
+└── src/
+    ├── main.jsx
+    ├── AppUnified.jsx
+    ├── styles.css
+    ├── components/
+    │   └── AppHeader.jsx
+    ├── features/
+    │   ├── settings/
+    │   └── library/
+    ├── models/
+    │   └── sampleModel.js
+    └── utils/
+        └── formatters.js
 ```
+
+React уже содержит:
+
+- Folder Tree;
+- File Table;
+- sorting;
+- selection;
+- keyboard navigation;
+- waveform presentation;
+- playback mock;
+- Auto Play state;
+- Settings;
+- Audio settings mock;
+- Library settings mock;
+- loading/scanning UI state;
+- unified Sample/Folder model.
+
+## 5. Native JUCE
+
+Основные файлы:
+
+```text
+juce/
+├── CMakeLists.txt
+├── BUILD_JUCE.bat
+└── Source/
+    ├── Main.cpp
+    ├── MainComponent.cpp
+    └── MainComponent.h
+```
+
+`Main.cpp` создаёт `JUCEApplication` и `DocumentWindow`.
+
+`MainComponent` размещает WebView и отдаёт ему весь available bounds.
+
+`MainComponent.cpp` содержит ResourceProvider, который безопасно отдаёт файлы только из `frontend/dist`.
+
+## 6. Что пока является mock
+
+Пока не подключены реальные native данные/операции:
+
+- выбранные папки;
+- recursive filesystem scan;
+- library index/database;
+- реальные audio files в File Table;
+- native playback;
+- ASIO/device control;
+- MIDI devices;
+- waveform generation;
+- metadata extraction;
+- tag database/search;
+- native drag & drop;
+- VST3 hosting.
+
+## 7. Архитектурные решения
+
+### React
+
+React отвечает за presentation и UI state. Он не должен становиться местом реализации native filesystem, ASIO или production audio engine.
+
+### JUCE
+
+JUCE отвечает за native OS operations, filesystem, scanning, audio, ASIO, MIDI, metadata, cache и VST3.
+
+### Bridge
+
+JS ↔ C++ bridge должен быть тонким API между этими слоями. Bridge ещё не реализован и будет отдельным этапом.
+
+### Audio
+
+Не использовать Web Audio API как production audio engine.
+
+### MIDI
+
+Не использовать Web MIDI API как production MIDI backend.
+
+## 8. UI/UX rules
+
+Подробный действующий контракт поведения хранится в `AGENTS.md`.
+
+Ключевые принципы:
+
+- hover не выполняет действий;
+- click и drag различаются по threshold;
+- selection и playback state не должны конфликтовать;
+- Folder Tree показывает только папки;
+- File Table показывает файлы выбранной папки;
+- waveform остаётся отдельной нижней панелью;
+- UI не переделывать на JUCE Widgets только ради native integration.
+
+## 9. Следующий этап
+
+**Stage 11 — Native Folder Picker.**
+
+Цель первого native backend этапа:
+
+```text
+Open Folder
+    ↓
+React → C++ command
+    ↓
+JUCE native Windows folder picker
+    ↓
+real absolute path
+    ↓
+C++ application state
+```
+
+На Stage 11 не выполнять полный filesystem scan. Сначала нужен надёжный native folder selection и bridge command.
+
+## 10. Полный порядок native development
+
+1. Stage 11 — Native Folder Picker.
+2. Stage 12 — Native Filesystem Scanner.
+3. Stage 13 — JUCE ↔ React bridge.
+4. Stage 14 — Real Library Model / Index.
+5. Stage 15 — Real Audio Playback.
+6. Stage 16 — Waveform Generation and Cache.
+7. Stage 17 — Audio Device / ASIO.
+8. Stage 18 — MIDI.
+9. Stage 19 — Metadata / Tags / Search.
+10. Stage 20 — Explorer / REAPER Drag & Drop.
+11. Stage 21 — VST3 Hosting.
+
+## 11. Development rules
+
+1. Перед сложной правкой сначала составляется план.
+2. Каждая native feature реализуется отдельным этапом.
+3. После каждого этапа должен проходить frontend build и native build.
+4. Не менять визуальный UI без явной необходимости.
+5. Не удалять существующий рабочий функционал без отдельного решения.
+6. Не коммитить build output.
+7. Не коммитить WebView2 SDK.
+8. Все backend-facing features должны иметь явную adapter/bridge boundary.
