@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fmtLength } from './utils/formatters.js'
+import { AppHeader } from './components/AppHeader.jsx'
 
 /* ========================= утилиты ========================= */
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v))
@@ -433,20 +434,12 @@ export default function App() {
   return (
     <div className="sample-browser-app">
       {/* ===== AppHeader ===== */}
-      <div className="app-header">
-        <div className="app-logo"><span className="logo-text">Ander browser</span></div>
-        <button
-          className="button-open-folder"
-          title="Open folder"
-          onMouseDown={press(() => folderInputRef.current?.click())}
-        >
-          <IconFolder />
-        </button>
-        <input
-          ref={folderInputRef} type="file" webkitdirectory="" multiple
-          style={{ display: 'none' }} onChange={handleFolderPick}
-        />
-      </div>
+      <AppHeader
+        folderInputRef={folderInputRef}
+        onOpenFolder={press(() => folderInputRef.current?.click())}
+        onFolderPick={handleFolderPick}
+        folderIcon={<IconFolder />}
+      />
 
       {/* ===== BodyLayout ===== */}
       <div className="body-layout">
