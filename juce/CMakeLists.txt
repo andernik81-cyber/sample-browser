@@ -36,6 +36,8 @@ target_sources(SampleBrowserNative
         Source/Main.cpp
         Source/MainComponent.cpp
         Source/MainComponent.h
+        Source/FolderPicker.cpp
+        Source/FolderPicker.h
 )
 
 target_compile_features(SampleBrowserNative PRIVATE cxx_std_17)
@@ -55,5 +57,10 @@ target_link_libraries(SampleBrowserNative
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
 )
+
+if (WIN32)
+    # SHBrowseForFolderW / SHGetPathFromIDListW (folder picker) live in Shell32.
+    target_link_libraries(SampleBrowserNative PRIVATE Shell32)
+endif()
 
 juce_generate_juce_header(SampleBrowserNative)

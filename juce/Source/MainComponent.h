@@ -15,7 +15,7 @@ private:
     static juce::String mimeTypeForExtension (const juce::String& filename);
     static std::optional<juce::WebBrowserComponent::Resource> serveResource
         (const juce::File& distRoot, const juce::String& path);
-    static juce::WebBrowserComponent::Options createOptions();
+    static juce::WebBrowserComponent::Options createOptions (MainComponent& self);
 
     juce::WebBrowserComponent webView;
 

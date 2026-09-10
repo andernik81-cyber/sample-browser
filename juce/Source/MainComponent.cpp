@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include "FolderPicker.h"
 
 //==============================================================================
 // Locates the frontend/dist directory.
@@ -102,7 +103,7 @@ std::optional<juce::WebBrowserComponent::Resource> MainComponent::serveResource
     return juce::WebBrowserComponent::Resource { std::move (bytes), mimeTypeForExtension (file.getFileName()) };
 }
 
-juce::WebBrowserComponent::Options MainComponent::createOptions()
+juce::WebBrowserComponent::Options MainComponent::createOptions (MainComponent& self)
 {
     const auto distRoot = findFrontendDistRoot();
 
@@ -112,15 +113,28 @@ juce::WebBrowserComponent::Options MainComponent::createOptions()
         return serveResource (distRoot, path);
     };
 
+    // Native bridge: exposes the `chooseFolder` function to the JS/React side via
+    // JUCE's stock `window.__JUCE__` interop. The react side calls it with no
+    // arguments and receives either an absolute path string or a null/undefined
+    // result when the user cancels.
+    auto chooseFolder = [&self] (const juce::Array<juce::var>&,
+                                 juce::WebBrowserComponent::NativeFunctionCompletion completion)
+    {
+        const auto path = FolderPicker::chooseFolder (self.getWindowHandle());
+        completion (path.isEmpty() ? juce::var::undefined() : juce::var (path));
+    };
+
     return juce::WebBrowserComponent::Options {}
         .withBackend (juce::WebBrowserComponent::Options::Backend::webview2)
         .withKeepPageLoadedWhenBrowserIsHidden()
+        .withNativeIntegrationEnabled (true)
+        .withNativeFunction ("chooseFolder", chooseFolder)
         .withResourceProvider (std::move (provider));
 }
 
 //==============================================================================
 MainComponent::MainComponent()
-    : webView (createOptions())
+    : webView (createOptions (*this))
 {
     setOpaque (true);
     addAndMakeVisible (webView);

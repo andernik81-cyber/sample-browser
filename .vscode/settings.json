@@ -1,3 +1,4 @@
 {
-    "cmake.sourceDirectory": "C:/Users/Ander/Documents/GitHub/sample-browser/juce"
+    "cmake.sourceDirectory": "C:/Users/Ander/Documents/GitHub/sample-browser/juce",
+    "editor.fontLigatures": false
 }

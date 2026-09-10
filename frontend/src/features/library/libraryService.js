@@ -1,4 +1,4 @@
-import { selectBrowserFolder } from './browserFolderPicker.js'
+import { chooseFolder } from '../bridge/juceBridge.js'
 
 /** @typedef {{id: string, path: string, status: 'online'|'offline'}} LibraryFolder */
 /** @typedef {{folders: LibraryFolder[], scanSubfolders: boolean, scanOnStartup: boolean}} LibrarySettings */
@@ -7,9 +7,16 @@ import { selectBrowserFolder } from './browserFolderPicker.js'
 // A future JUCE implementation supplies authoritative IDs/paths using these methods.
 const getLibraryFolders = async (folders) => folders.map(({ id, path, status }) => ({ id, path, status }))
 
+// Resolves a serializable independent root (absolute path from the JUCE native
+// folder picker, or a browser fallback path), or null on cancellation/empty input.
+const selectFolder = async () => {
+  const path = await chooseFolder()
+  if (!path) return null
+  return { id: `library-${crypto.randomUUID()}`, path, status: 'online' }
+}
+
 export const libraryService = {
-  // Resolves a serializable independent root, or null on cancellation/empty input.
-  selectFolder: selectBrowserFolder,
+  selectFolder,
   getLibraryFolders,
 
   // Acknowledge configuration removal only. NEVER delete or modify disk data.

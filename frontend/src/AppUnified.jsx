@@ -2,11 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fmtLength } from './utils/formatters.js'
 import { AppHeader } from './components/AppHeader.jsx'
 import { SettingsPanel } from './features/settings/SettingsPanel.jsx'
-import { INITIAL_FILES, INITIAL_TREE, createBrowserSample } from './models/sampleModel.js'
+import { INITIAL_FILES, INITIAL_TREE } from './models/sampleModel.js'
+import { chooseFolder } from './features/bridge/juceBridge.js'
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v))
 const press = (fn) => (e) => { if (e.button === 0) fn(e) }
-const AUDIO_EXT = ['wav', 'aif', 'aiff', 'flac', 'mp3', 'ogg']
 const DRAG_THRESHOLD_PX = 4
 const VOLUME_MIN = -60
 const VOLUME_MAX = 12
@@ -201,17 +201,11 @@ export default function App() {
     const next = e.key === 'ArrowDown' ? sortedFiles[Math.min(idx + 1, sortedFiles.length - 1)] : sortedFiles[Math.max(idx - 1, 0)]
     if (next && next.id !== selectedFile) selectFile(next.id)
   }
-  const handleFolderPick = (e) => {
-    const list = Array.from(e.target.files || []); e.target.value = ''
-    if (!list.length) return
-    const rootName = (list[0].webkitRelativePath || 'Folder').split('/')[0]
-    const audio = list.filter((f) => AUDIO_EXT.includes((f.name.split('.').pop() || '').toLowerCase()))
-    const id = 'local-' + Date.now()
-    const files = audio.map((file, i) => createBrowserSample(file, `${id}-${i}`, rootName))
-    const path = `browser-folder:${encodeURIComponent(rootName)}`
-    setTree((t) => ({ ...t, children: [...t.children, { id, name: rootName, path, parentId: 'samples', status: 'online', children: [] }] }))
-    setFilesByFolder((m) => ({ ...m, [id]: files }))
-    setExpanded((s) => new Set(s).add(id)); setSelectedFolder(id); setSelectedFile(null); setPlaying(false); setPosition(0)
+  const handleFolderPick = async () => {
+    const path = await chooseFolder()
+    if (!path) return
+    const id = `library-${crypto.randomUUID()}`
+    updateLibrarySettings((current) => ({ ...current, folders: [...current.folders, { id, path, status: 'online' }] }))
   }
   const flatTree = useMemo(() => {
     const out = []; const walk = (node, depth) => { out.push({ node, depth }); if (node.children?.length && expanded.has(node.id)) node.children.forEach((c) => walk(c, depth + 1)) }
@@ -223,7 +217,7 @@ export default function App() {
   const updateLibrarySettings = (update) => setSettings((current) => ({ ...current, library: update(current.library) }))
 
   return <div className="sample-browser-app">
-    <AppHeader folderInputRef={folderInputRef} onOpenFolder={press(() => folderInputRef.current?.click())} onFolderPick={handleFolderPick} folderIcon={<IconFolder />} settingsOpen={settingsOpen} settingsButtonRef={settingsButtonRef} onToggleSettings={press(() => setSettingsOpen((open) => !open))} />
+    <AppHeader folderInputRef={folderInputRef} onOpenFolder={press(() => handleFolderPick())} onFolderPick={handleFolderPick} folderIcon={<IconFolder />} settingsOpen={settingsOpen} settingsButtonRef={settingsButtonRef} onToggleSettings={press(() => setSettingsOpen((open) => !open))} />
     <div className="body-layout">
       <OverlayScroll className="folder-tree-container" areaClassName="folder-tree-area">
         {flatTree.map(({ node, depth }) => {
