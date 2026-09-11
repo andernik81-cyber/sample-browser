@@ -16,14 +16,14 @@ const DOUBLE_PRESS_MS = 500
 
 // === Stage 12: native scan data source =======================================
 // In the native app the folder tree and file table are fed by the C++ scanner
-// (scanStarted/folderBatch events). The mock model stays as the browser
-// (`npm run dev`) fallback and as the initial visual state.
-const LIBRARY_ROOT_ID = 'library-root'
-
-// Builds the nested tree expected by the existing renderer from the flat
-// folder map delivered by scanStarted/folderBatch events. A synthetic root
-// groups all library locations; the structure/fields match createFolder.
-function buildTreeFromMap(map) {
+// (scanStarted/folderBatch events) and start completely empty. The mock model
+// stays only as the browser (`npm run dev`) fallback. The native tree is an
+// array of real scanner root folders (one per library location) — no synthetic
+// root node is created.
+// Builds the root-level nodes of the tree from the flat folder map delivered
+// by scanStarted/folderBatch events. Children attach via parentId; the
+// structure/fields match createFolder.
+function buildRootsFromMap(map) {
   const kidsByParent = new Map()
   const roots = []
   for (const id of Object.keys(map)) {
@@ -36,7 +36,7 @@ function buildTreeFromMap(map) {
     }
   }
   const build = (folder) => ({ ...folder, children: (kidsByParent.get(folder.id) || []).map(build) })
-  return { id: LIBRARY_ROOT_ID, name: 'Samples', path: '', parentId: null, status: 'online', children: roots.map(build) }
+  return roots.map(build)
 }
 
 function hashCode(str) {
@@ -143,11 +143,15 @@ const displayRate = (value) => value ? `${(value / 1000).toFixed(value % 1000 ==
 const displayNumber = (value) => value ? String(value) : '—'
 
 export default function App() {
-  const [tree, setTree] = useState(INITIAL_TREE)
-  const [filesByFolder, setFilesByFolder] = useState(INITIAL_FILES)
-  const [expanded, setExpanded] = useState(() => new Set(['samples', 'drums']))
-  const [selectedFolder, setSelectedFolder] = useState('snare')
-  const [selectedFile, setSelectedFile] = useState('snare-2')
+  // Native JUCE mode starts empty/neutral: no fake tree, files or selection.
+  // The mock model (INITIAL_TREE/INITIAL_FILES) is the browser (`npm run dev`)
+  // fallback only and is never used inside the native app.
+  const nativeBackend = isNativeBackendAvailable()
+  const [tree, setTree] = useState(nativeBackend ? [] : [INITIAL_TREE])
+  const [filesByFolder, setFilesByFolder] = useState(nativeBackend ? {} : INITIAL_FILES)
+  const [expanded, setExpanded] = useState(() => new Set(nativeBackend ? [] : ['samples', 'drums']))
+  const [selectedFolder, setSelectedFolder] = useState(nativeBackend ? null : 'snare')
+  const [selectedFile, setSelectedFile] = useState(nativeBackend ? null : 'snare-2')
   const [sort, setSort] = useState({ key: 'name', dir: 1 })
   const [autoPlay, setAutoPlay] = useState(false)
   const [playing, setPlaying] = useState(false)
@@ -161,10 +165,9 @@ export default function App() {
   const [settings, setSettings] = useState(() => ({
     audio: { driver: 'asio', device: 'example-asio-device', sampleRate: 48000, bufferSize: 256, output: '1-2' },
     library: {
-      folders: [
-        { id: 'library-1', path: 'D:\\Samples', status: 'online' },
-        { id: 'library-2', path: 'E:\\Sound Design', status: 'offline' },
-      ],
+      // Starts empty: only real user-picked native paths live here. No fake
+      // test locations (D:\Samples / E:\Sound Design are removed).
+      folders: [],
       scanSubfolders: true,
       scanOnStartup: true,
     },
@@ -207,11 +210,10 @@ export default function App() {
     return [
       subscribeNativeEvent('scanStarted', (p) => {
         scanIdRef.current = p.scanId
-        const map = {}
-        p.roots.forEach((root) => { map[root.id] = root })
-        setTree(buildTreeFromMap(map))
+        // Real scanner roots become the top level of the tree (no synthetic root).
+        setTree(p.roots)
         setFilesByFolder({})
-        setExpanded(new Set([LIBRARY_ROOT_ID, ...p.roots.map((root) => root.id)]))
+        setExpanded(new Set(p.roots.map((root) => root.id)))
         setSelectedFolder(p.roots[0]?.id || null)
         setSelectedFile(null)
         setPlaying(false)
@@ -221,12 +223,13 @@ export default function App() {
       subscribeNativeEvent('folderBatch', (p) => {
         if (!guard(p)) return
         setTree((prev) => {
-          if (!prev || prev.id !== LIBRARY_ROOT_ID) return prev
+          // Merge new folder records into the existing flat map, then rebuild
+          // the real root-level array; children attach via parentId.
           const map = {}
-          const walk = (node) => { map[node.id] = { ...node }; delete map[node.id].children; node.children?.forEach(walk) }
-          walk(prev)
+          const walk = (node) => { map[node.id] = { ...node }; node.children?.forEach(walk) }
+          prev.forEach(walk)
           p.folders.forEach((folder) => { map[folder.id] = folder })
-          return buildTreeFromMap(map)
+          return buildRootsFromMap(map)
         })
         setFilesByFolder((prev) => {
           const next = { ...prev }
@@ -295,7 +298,7 @@ export default function App() {
   }
   const flatTree = useMemo(() => {
     const out = []; const walk = (node, depth) => { out.push({ node, depth }); if (node.children?.length && expanded.has(node.id)) node.children.forEach((c) => walk(c, depth + 1)) }
-    walk(tree, 0); return out
+    tree.forEach((root) => walk(root, 0)); return out
   }, [tree, expanded])
   const stopDisabled = !currentFile || (!playing && position === 0)
   const closeSettings = () => { setSettingsOpen(false); settingsButtonRef.current?.focus() }

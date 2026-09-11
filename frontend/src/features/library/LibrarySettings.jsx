@@ -43,7 +43,6 @@ export const LibrarySettings = ({ library, onChange }) => {
             </button>
           ))}
         </div>
-        <p className="library-secondary-text" data-testid="library-prototype-note">Mock locations. Browser picks are temporary identifiers, not native paths.</p>
         <div className="library-action-group">
           <LibraryButton testId="library-add-folder" onAction={actions.addFolder} disabled={locked}>Add Folder</LibraryButton>
           <LibraryButton testId="library-remove-folder" onAction={actions.requestRemoval} disabled={locked || !actions.selectedFolder}>Remove Folder</LibraryButton>
