@@ -14,10 +14,17 @@ export const useLibraryActions = (library, onChange) => {
     try {
       const folder = await libraryService.selectFolder()
       if (folder) {
+        // updateLibrarySettings expects an updater-style callback (not a plain object).
         onChange((current) => ({ ...current, folders: [...current.folders, folder] }))
         setSelectedId(folder.id)
+        // Stage 12: after adding a location the native scanner (re)starts for
+        // all locations; the browser fallback keeps the mock behavior.
+        const updated = { ...library, folders: [...library.folders, folder] }
+        const scan = await libraryService.rescanLibrary(updated)
+        setOperation({ status: 'complete', message: `Folder added. ${scan.message}` })
+      } else {
+        setOperation({ status: 'complete', message: 'No folder added. Selection canceled or the folder is empty.' })
       }
-      setOperation({ status: 'complete', message: folder ? 'Folder added. No files were scanned.' : 'No folder added. Selection canceled or the folder is empty.' })
     } catch (error) { fail(error) }
   }
 

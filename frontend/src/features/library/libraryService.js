@@ -1,4 +1,4 @@
-import { chooseFolder } from '../bridge/juceBridge.js'
+import { chooseFolder, isNativeBackendAvailable, startScan } from '../bridge/juceBridge.js'
 
 /** @typedef {{id: string, path: string, status: 'online'|'offline'}} LibraryFolder */
 /** @typedef {{folders: LibraryFolder[], scanSubfolders: boolean, scanOnStartup: boolean}} LibrarySettings */
@@ -15,6 +15,23 @@ const selectFolder = async () => {
   return { id: `library-${crypto.randomUUID()}`, path, status: 'online' }
 }
 
+// Stage 12: inside the native app the rescan request starts the real C++
+// filesystem scanner. Results arrive later as scan* bridge events and are
+// merged into the existing UI model; this call does not block.
+const startNativeScan = async (library) => {
+  const paths = library.folders.filter((folder) => folder.status !== 'offline').map((folder) => folder.path)
+  const started = await startScan(paths, library.scanSubfolders)
+  return {
+    status: 'complete',
+    mock: false,
+    started,
+    folderIds: library.folders.map((folder) => folder.id),
+    message: started
+      ? 'Native filesystem scan started. Folders and files will appear as they are found.'
+      : 'Native backend did not start the scan.',
+  }
+}
+
 export const libraryService = {
   selectFolder,
   getLibraryFolders,
@@ -24,6 +41,9 @@ export const libraryService = {
 
   /** @param {LibrarySettings} library */
   rescanLibrary: async (library) => {
+    if (isNativeBackendAvailable())
+      return startNativeScan(library)
+
     const folders = await getLibraryFolders(library.folders)
     const onlineCount = folders.filter((folder) => folder.status === 'online').length
     const offlineCount = folders.filter((folder) => folder.status === 'offline').length

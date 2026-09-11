@@ -38,6 +38,8 @@ target_sources(SampleBrowserNative
         Source/MainComponent.h
         Source/FolderPicker.cpp
         Source/FolderPicker.h
+        Source/LibraryScanner.cpp
+        Source/LibraryScanner.h
 )
 
 target_compile_features(SampleBrowserNative PRIVATE cxx_std_17)

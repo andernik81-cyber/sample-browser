@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fmtLength } from './utils/formatters.js'
 import { AppHeader } from './components/AppHeader.jsx'
 import { SettingsPanel } from './features/settings/SettingsPanel.jsx'
-import { INITIAL_FILES, INITIAL_TREE } from './models/sampleModel.js'
-import { chooseFolder } from './features/bridge/juceBridge.js'
+import { INITIAL_FILES, INITIAL_TREE, createSample } from './models/sampleModel.js'
+import { chooseFolder, isNativeBackendAvailable, startScan, subscribeNativeEvent } from './features/bridge/juceBridge.js'
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v))
 const press = (fn) => (e) => { if (e.button === 0) fn(e) }
@@ -13,6 +13,31 @@ const VOLUME_MAX = 12
 const VOLUME_STEP = 0.5
 const VOLUME_PX_PER_STEP = 12
 const DOUBLE_PRESS_MS = 500
+
+// === Stage 12: native scan data source =======================================
+// In the native app the folder tree and file table are fed by the C++ scanner
+// (scanStarted/folderBatch events). The mock model stays as the browser
+// (`npm run dev`) fallback and as the initial visual state.
+const LIBRARY_ROOT_ID = 'library-root'
+
+// Builds the nested tree expected by the existing renderer from the flat
+// folder map delivered by scanStarted/folderBatch events. A synthetic root
+// groups all library locations; the structure/fields match createFolder.
+function buildTreeFromMap(map) {
+  const kidsByParent = new Map()
+  const roots = []
+  for (const id of Object.keys(map)) {
+    const folder = map[id]
+    if (folder.parentId && map[folder.parentId]) {
+      if (!kidsByParent.has(folder.parentId)) kidsByParent.set(folder.parentId, [])
+      kidsByParent.get(folder.parentId).push(folder)
+    } else {
+      roots.push(folder)
+    }
+  }
+  const build = (folder) => ({ ...folder, children: (kidsByParent.get(folder.id) || []).map(build) })
+  return { id: LIBRARY_ROOT_ID, name: 'Samples', path: '', parentId: null, status: 'online', children: roots.map(build) }
+}
 
 function hashCode(str) {
   let h = 0
@@ -129,6 +154,10 @@ export default function App() {
   const [position, setPosition] = useState(0)
   const [volume, setVolume] = useState(0.0)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  // Stage 12: scan generation bookkeeping. folderId -> folder map delivered by
+  // the native scanner; null while the mock data source is active.
+  const [scanState, setScanState] = useState({ status: 'idle', foldersFound: 0, filesFound: 0, errors: [] })
+  const scanIdRef = useRef(0)
   const [settings, setSettings] = useState(() => ({
     audio: { driver: 'asio', device: 'example-asio-device', sampleRate: 48000, bufferSize: 256, output: '1-2' },
     library: {
@@ -170,6 +199,57 @@ export default function App() {
     if (currentFile && currentFile.duration && position >= currentFile.duration) { setPosition(currentFile.duration); setPlaying(false) }
   }, [position, currentFile])
 
+  // Stage 12: native scanner events -> existing model state. In a plain
+  // browser these subscriptions are no-ops and the mock data stays active.
+  useEffect(() => {
+    if (!isNativeBackendAvailable()) return
+    const guard = (payload) => payload && payload.scanId === scanIdRef.current
+    return [
+      subscribeNativeEvent('scanStarted', (p) => {
+        scanIdRef.current = p.scanId
+        const map = {}
+        p.roots.forEach((root) => { map[root.id] = root })
+        setTree(buildTreeFromMap(map))
+        setFilesByFolder({})
+        setExpanded(new Set([LIBRARY_ROOT_ID, ...p.roots.map((root) => root.id)]))
+        setSelectedFolder(p.roots[0]?.id || null)
+        setSelectedFile(null)
+        setPlaying(false)
+        setPosition(0)
+        setScanState({ status: 'scanning', foldersFound: 0, filesFound: 0, errors: [] })
+      }),
+      subscribeNativeEvent('folderBatch', (p) => {
+        if (!guard(p)) return
+        setTree((prev) => {
+          if (!prev || prev.id !== LIBRARY_ROOT_ID) return prev
+          const map = {}
+          const walk = (node) => { map[node.id] = { ...node }; delete map[node.id].children; node.children?.forEach(walk) }
+          walk(prev)
+          p.folders.forEach((folder) => { map[folder.id] = folder })
+          return buildTreeFromMap(map)
+        })
+        setFilesByFolder((prev) => {
+          const next = { ...prev }
+          const byFolder = {}
+          p.files.forEach((file) => { (byFolder[file.folderId] = byFolder[file.folderId] || []).push(file) })
+          for (const folderId of Object.keys(byFolder))
+            next[folderId] = [...(next[folderId] || []), ...byFolder[folderId].map((record) => createSample(record))]
+          return next
+        })
+        setScanState((s) => ({ ...s, foldersFound: p.foldersFound, filesFound: p.filesFound }))
+      }),
+      subscribeNativeEvent('scanProgress', (p) => {
+        if (guard(p)) setScanState((s) => ({ ...s, foldersFound: p.foldersFound, filesFound: p.filesFound }))
+      }),
+      subscribeNativeEvent('scanComplete', (p) => {
+        if (guard(p)) setScanState((s) => ({ ...s, status: p.canceled ? 'idle' : 'ready', foldersFound: p.foldersFound, filesFound: p.filesFound }))
+      }),
+      subscribeNativeEvent('scanError', (p) => {
+        if (guard(p)) setScanState((s) => ({ ...s, errors: [...s.errors, p] }))
+      }),
+    ].reduce((off, unsub) => (unsub ? [...off, unsub] : off), [])
+  }, [])
+
   const selectFile = useCallback((id) => { setSelectedFile(id); setPosition(0); setPlaying(!!id && autoPlay) }, [autoPlay])
   const selectFolder = (node) => { setSelectedFolder(node.id); setSelectedFile(null); setPlaying(false); setPosition(0) }
   const toggleFolder = (node) => { if (!node.children?.length) return; setExpanded((prev) => { const s = new Set(prev); s.has(node.id) ? s.delete(node.id) : s.add(node.id); return s }) }
@@ -205,7 +285,13 @@ export default function App() {
     const path = await chooseFolder()
     if (!path) return
     const id = `library-${crypto.randomUUID()}`
-    updateLibrarySettings((current) => ({ ...current, folders: [...current.folders, { id, path, status: 'online' }] }))
+    // Stage 12: the new location joins the library and the native scanner
+    // (re)starts for all locations. Old scans are cancelled by the scanner,
+    // and the browser fallback simply keeps the mock data.
+    const nextFolders = [...settings.library.folders, { id, path, status: 'online' }]
+    updateLibrarySettings((current) => ({ ...current, folders: nextFolders }))
+    if (isNativeBackendAvailable())
+      await startScan(nextFolders.filter((folder) => folder.status !== 'offline').map((folder) => folder.path), settings.library.scanSubfolders)
   }
   const flatTree = useMemo(() => {
     const out = []; const walk = (node, depth) => { out.push({ node, depth }); if (node.children?.length && expanded.has(node.id)) node.children.forEach((c) => walk(c, depth + 1)) }

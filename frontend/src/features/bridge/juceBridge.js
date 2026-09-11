@@ -54,3 +54,36 @@ export const chooseFolder = async () => {
   const folder = await selectBrowserFolder()
   return folder && typeof folder.path === 'string' && folder.path.length > 0 ? folder.path : null
 }
+
+// === Stage 12: native filesystem scanner =====================================
+// Events pushed from C++ (WebBrowserComponent::emitEventIfBrowserIsVisible) and
+// received through the stock `window.__JUCE__.backend.addEventListener` channel:
+//   scanStarted  { scanId, roots: [{id, name, path, parentId, status}] }
+//   folderBatch  { scanId, folders: [...], files: [...], foldersFound, filesFound }
+//   scanProgress { scanId, foldersFound, filesFound }
+//   scanComplete { scanId, foldersFound, filesFound, canceled }
+//   scanError    { scanId, rootId, path, message }
+// In a plain browser (`npm run dev`) no native events exist, so subscription is
+// a no-op and the mock data source keeps working.
+
+// Subscribes to a native event and returns an unsubscribe function.
+export const subscribeNativeEvent = (eventId, handler) => {
+  if (!isNativeBackendAvailable()) return () => {}
+  const token = window.__JUCE__.backend.addEventListener(eventId, handler)
+  return () => window.__JUCE__.backend.removeEventListener(token)
+}
+
+// Starts the native recursive scan of the given library locations.
+// Returns true when the native scan was actually started, false otherwise.
+export const startScan = async (locations, recursive = true) => {
+  if (isNativeBackendAvailable())
+    return callNativeFunction('startScan', [locations, recursive]).then((result) => result === true)
+  return false
+}
+
+// Requests cancellation of the running native scan (safe no-op otherwise).
+export const cancelScan = async () => {
+  if (isNativeBackendAvailable())
+    return callNativeFunction('cancelScan', []).then((result) => result === true)
+  return false
+}

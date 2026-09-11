@@ -124,11 +124,49 @@ juce::WebBrowserComponent::Options MainComponent::createOptions (MainComponent& 
         completion (path.isEmpty() ? juce::var::undefined() : juce::var (path));
     };
 
+    // Stage 12: starts the native filesystem scanner. JS call shape:
+    //   startScan(locations: string[], recursive: boolean)
+    // Every path is scanned recursively for .wav/.aif/.aiff/.flac; results are
+    // pushed back to React as scanStarted/folderBatch/scanProgress/scanComplete/
+    // scanError native events, in batches of at most 256 records.
+    auto startScan = [&self] (const juce::Array<juce::var>& args,
+                              juce::WebBrowserComponent::NativeFunctionCompletion completion)
+    {
+        juce::StringArray paths;
+        bool recursive = true;
+
+        for (const auto& argument : args)
+        {
+            if (argument.isString())
+                paths.add (argument.toString());
+            else if (auto* array = argument.getArray())
+                for (const auto& item : *array)
+                    if (item.isString())
+                        paths.add (item.toString());
+        }
+
+        if (args.size() > 1)
+            recursive = (bool) args[1];
+
+        self.getScanner().startScan (paths, recursive);
+        completion (juce::var (true));
+    };
+
+    // Requests cancellation of the running scan (safe no-op if idle).
+    auto cancelScan = [&self] (const juce::Array<juce::var>&,
+                               juce::WebBrowserComponent::NativeFunctionCompletion completion)
+    {
+        self.getScanner().cancelScan();
+        completion (juce::var (true));
+    };
+
     return juce::WebBrowserComponent::Options {}
         .withBackend (juce::WebBrowserComponent::Options::Backend::webview2)
         .withKeepPageLoadedWhenBrowserIsHidden()
         .withNativeIntegrationEnabled (true)
         .withNativeFunction ("chooseFolder", chooseFolder)
+        .withNativeFunction ("startScan", startScan)
+        .withNativeFunction ("cancelScan", cancelScan)
         .withResourceProvider (std::move (provider));
 }
 
